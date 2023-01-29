@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 import sys
 import time
 from http import HTTPStatus
@@ -16,7 +16,6 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
 
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
@@ -47,13 +46,12 @@ def check_tokens():
 def get_api_answer(timestamp):
     """Makes a request to the API and return JSON response."""
     response = None
-
     try:
         response = requests.get(
-        ENDPOINT,
-        headers=HEADERS,
-        params={'from_date': timestamp}
-    )
+            ENDPOINT,
+            headers=HEADERS,
+            params={'from_date': timestamp}
+        )
     except requests.RequestException as error:
         logger.error(f'Something wrong with your request{error}')
 

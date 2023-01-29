@@ -2,6 +2,7 @@ import os
 import logging
 import sys
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
@@ -45,28 +46,40 @@ def check_tokens():
 
 def get_api_answer(timestamp):
     """Makes a request to the API and return JSON response."""
+    response = None
+
     try:
         response = requests.get(
-            ENDPOINT,
-            headers=HEADERS,
-            params={'from_date': timestamp}
-        )
-    except Exception as error:
-        logging.error(error)
-    else:
-        return response.json()
+        ENDPOINT,
+        headers=HEADERS,
+        params={'from_date': timestamp}
+    )
+    except requests.RequestException as error:
+        logger.error(f'Something wrong with your request{error}')
+
+    if response.status_code != HTTPStatus.OK:
+        raise Exception(f'{response.status_code} error')
+    return response.json()
 
 
 def check_response(response):
     """Checks response API conformity to documentation."""
     keys_according_documentation = {'current_date': int(), 'homeworks': list()}
-    for key, value in response.items():
-        standard_type = type(keys_according_documentation.get(key))
-        if key not in keys_according_documentation:
+
+    if not isinstance(response, type(dict())):
+        message = "Received response has wrong type <class 'dict'>"
+        logger.error(message)
+        raise TypeError(message)
+
+    for key in keys_according_documentation.keys():
+        if key not in response.keys():
             message = (f'Responded API is not conformable to documentation: '
                        f'There is no such key as {key}')
             logger.error(message)
-            raise UnboundLocalError(message)
+            raise Exception(message)
+
+    for key, value in response.items():
+        standard_type = type(keys_according_documentation.get(key))
         if not isinstance(value, standard_type):
             message = (f'Responded API is not conformable to documentation: '
                        f'Type of "{key}" is not equal to {standard_type}')
@@ -79,19 +92,28 @@ def parse_status(homework):
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
 
+    if 'homework_name' not in homework:
+        message = 'There is no key "homework_name" in homework'
+        logger.error(message)
+        raise Exception(message)
+
     if homework_status not in HOMEWORK_VERDICTS:
         message = f'Unexpected status {homework_status} from request'
         logging.error(message)
-        raise ValueError(message)
+        raise KeyError(message)
 
-    verdict = HOMEWORK_VERDICTS.get(homework.get('status'))
+    verdict = HOMEWORK_VERDICTS.get(homework_status)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def send_message(bot, message):
     """Sends message in telegram chat by its id."""
-    bot.send_message(TELEGRAM_CHAT_ID, message)
-    logging.debug(f'Bot sent message: "{message}"')
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logging.debug(f'Bot sent message: "{message}"')
+    except Exception as error:
+        logging.error(f'There is an error while you '
+                      f'trying send a message via bot: {error}')
 
 
 def main():
@@ -105,7 +127,6 @@ def main():
         try:
             response = get_api_answer(timestamp)
             check_response(response)
-
             if response.get('homeworks'):
                 message = parse_status(response.get('homeworks')[0])
                 send_message(bot, message)
@@ -113,12 +134,13 @@ def main():
                 logger.debug('There is no new homework statuses in response')
 
             timestamp = response.get('current_date')
-            time.sleep(RETRY_PERIOD)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(error)
             bot.send_message(TELEGRAM_CHAT_ID, message)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':

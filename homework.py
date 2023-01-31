@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import sys
@@ -9,6 +8,8 @@ from logging.handlers import RotatingFileHandler
 import requests
 import telegram
 from dotenv import load_dotenv
+
+from exceptions import BadResponseExtension, InvalidJSONExtension
 
 load_dotenv()
 
@@ -103,14 +104,14 @@ def get_api_answer(timestamp):
         message = MESSAGE_FOR_GET_API_ANSWER_ACTION.format(
             action='response', endpoint=ENDPOINT, headers=HEADERS,
             request_parameters=request_parameters, error=response.status_code)
-        raise Exception(message)
+        raise BadResponseExtension(message)
 
     try:
         result = response.json()
-    except json.decoder.JSONDecodeError as error:
+    except InvalidJSONExtension as error:
         message = MESSAGE_FOR_GET_API_ANSWER_JSON.format(error=error)
         logger.error(message)
-        raise json.decoder.JSONDecodeError(message)
+        raise InvalidJSONExtension(message)
 
     return result
 
@@ -166,7 +167,7 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.debug(MESSAGE_FOR_SEND_MESSAGE_SUCCESS.format(message=message))
-    except Exception as error:
+    except telegram.error.TelegramError as error:
         logger.error(MESSAGE_FOR_SEND_MESSAGE_ERROR.format(error=error))
 
 

@@ -1,3 +1,4 @@
+import json.decoder
 import logging
 import os
 import sys
@@ -108,7 +109,7 @@ def get_api_answer(timestamp):
 
     try:
         result = response.json()
-    except InvalidJSONExtension as error:
+    except json.decoder.JSONDecodeError as error:
         message = MESSAGE_FOR_GET_API_ANSWER_JSON.format(error=error)
         logger.error(message)
         raise InvalidJSONExtension(message)
